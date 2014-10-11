@@ -1,6 +1,7 @@
+package chip8
+
 import util.Random
 import java.util.Date
-import java.lang.Thread
 
 object Instruction extends Enumeration {
   type Instruction = Value //((java.lang.Integer, java.lang.Integer) => Unit)
@@ -49,21 +50,23 @@ object Instruction extends Enumeration {
 
 }
 
-object Emulator {
-  var mem = new Array[Byte](0x1000)
+class Emulator {
+  private val mem = new Array[Byte](0x1000)
   // mem map
   // no-man's-land / fonts: 0x0 - 0x200
-  // stack: 0xEA0 - 0xEFF
-  // frame buffer: 0xF00 - 0xFFF
+  // user mem area:         0x200 - 0xE9F
+  // stack:                 0xEA0 - 0xEFF
+  // frame buffer:          0xF00 - 0xFFF
 
-  val rom_base = 0x200
-  val stack_top = 0xEFF
-  val fb_base = 0xF00
-  val font_base = 0x00
-  val g_height = 32
-  val g_width = 64
+  private val rom_base = 0x200
+  private val stack_top = 0xEFF
+  private val fb_base = 0xF00
+  private val font_base = 0x00
 
-  val font = Array(
+  val screen_height = 32
+  val screen_width = 64
+
+  private val font = Array(
     0xF0,0x90,0x90,0x90,0xF0, // 0
     0x20,0x60,0x20,0x20,0x70, // 1
     0xF0,0x10,0xF0,0x80,0xF0, // 2
@@ -82,16 +85,28 @@ object Emulator {
     0xF0,0x80,0xF0,0x80,0x80  // F
   )
 
-  val r = new Array[Byte](16)
-  var r_i : Short = 0
-  var pc = 0
-  var sp = 0
-  var delay = 0
-  var sound = 0
-  var soundStart = new Date()
-  var timerStart = new Date()
-  var keys = new Array[Boolean](16)
-  val default_rom = "/home/max/roms/PONG";
+  private val r = new Array[Byte](16)
+  private var r_i : Short = 0
+  private var pc = 0
+  private var sp = 0
+  private var delay = 0
+  private var sound = 0
+  private var soundStart : Date = null
+  private var timerStart : Date = null
+  private var keys : (Byte => Boolean) = null
+  private object key_barrier
+  private var panic = false
+  private object panic_barrier
+
+  def setKeyboardCallbacks(getKey : Byte => Boolean): Unit = {
+    keys = getKey
+  }
+
+  def signalKey(): Unit = {
+    key_barrier.synchronized {
+      key_barrier.notify()
+    }
+  }
 
   def loadRom(path: String) {
     reset()
@@ -106,32 +121,20 @@ object Emulator {
     sp = stack_top - 1 // sp is to point to the freshest free 16-bit stack slot
     delay = 0
     sound = 0
-    keys.map(_ => 0)
+    panic = false
     for (i <- font.indices)
       mem(i) = font(i).toByte
   }
 
-  def main(args : Array[String]) {
-    var rom_path = default_rom
-    if (args.length > 0) {
-      rom_path = args(0)
-    }
-    println(s"loading rom: $rom_path")
-    loadRom(rom_path)
-    println("rom loaded, starting rom...")
-    while (true) {
-      run(20)
-      printScreen()
-      Thread.sleep(100)
-    }
-    println("exiting.")
+  def pixel(x: Int,y: Int) : Boolean = {
+    (mem(fb_base + y * (screen_width/8) + x/8) & (0x80 >> (x % 8))) != 0
   }
 
-  def nibble(n : Int, instruction : Int) : Byte = { // assumes 16-bit as base size
+  private def nibble(n : Int, instruction : Int) : Byte = { // assumes 16-bit as base size
     ((instruction & (0xF << (n*4))) >> (n*4)).toByte
   }
 
-  def decode(inst : Int) = {
+  private def decode(inst : Int) = {
     /*
     val b = inst.toShort
     val p = pc.toShort
@@ -185,13 +188,19 @@ object Emulator {
     }
   }
 
+  def abort(): Unit = {
+    panic_barrier.synchronized {
+      panic = true
+      panic_barrier.notifyAll()
+    }
+  }
+
   def step = () => run(1)
 
   def run(instructions : Int): Unit = {
     var n = instructions
-    var panic = false
     var inst = 0x0000
-    while (!panic && n > 0 || n == -1 ) {
+    while (!panic && (n > 0 || n == -1)) {
       inst = ((mem(pc) << 8) | (mem(pc + 1).toShort & 0xFF)) & 0xFFFF // CHIP-8 is big-endian
       import Instruction._
 
@@ -256,25 +265,24 @@ object Emulator {
         case `JMI`   => pc = ((inst & 0xFFF) + r(0)).toShort - 2
         case `RAND`  => r(nibble(2, inst)) = (Random.nextInt(255) & (inst & 0xFF)).toByte
         case `SPRITE`=> // TODO: fix collisions
-          r(0xF) = 0x00.toByte
+          r(0x0F) = 0x00.toByte
           val x = r(nibble(2, inst))
           val y = r(nibble(1, inst))
-          //println(x, y)
           for (i <- 0 until (inst & 0xF)) {
             // draw sprite
             val sprite = mem(r_i + i)
-            val mem_loc = fb_base + (g_width/8) * ((y + i) % g_height) + ((x/8) % (g_width/8))
+            val mem_loc = fb_base + (screen_width/8) * ((y + i) % screen_height) + ((x/8) % (screen_width/8))
             if ((mem(mem_loc) & ((sprite.toShort & 0xFF) >> (x % 8)).toByte).toByte != 0) {
               // collision
-              r(0x00) = 0x1.toByte
+              r(0x0F) = 0x1.toByte
             }
             mem(mem_loc) = (mem(mem_loc) ^ ((sprite.toShort & 0xFF) >> (x % 8)).toByte).toByte
             if (x % 8 != 0) {
               // we need to find a second byte right of this one
-              val mem_loc = fb_base + (g_width/8) * ((y + i) % g_height) + (((x+8)/8) % (g_width/8))
+              val mem_loc = fb_base + (screen_width/8) * ((y + i) % screen_height) + (((x+8)/8) % (screen_width/8))
               if ((mem(mem_loc) & ((sprite.toShort & 0xFF) << (8 - (x % 8))).toByte) != 0) {
                 // collision
-                r(0x00) = 0x1.toByte
+                r(0x0F) = 0x1.toByte
               }
               mem(mem_loc) = (mem(mem_loc) ^ ((sprite.toShort & 0xFF) << (8 - (x % 8))).toByte).toByte
             }
@@ -282,16 +290,29 @@ object Emulator {
         case `SKPR`  => if (keys(nibble(2, inst))) pc += 2
         case `SKUP`  => if (!keys(nibble(2, inst))) pc += 2
         case `GDELAY`=>
-          var ticks = ((new Date()).getTime() - timerStart.getTime()) / 1000 * 60
+          val ticks = ((new Date()).getTime() - timerStart.getTime()) / 1000 * 60
           if (delay - ticks < 0)
             r(nibble(2, inst)) = 0.toByte
           else
             r(nibble(2, inst)) = (delay - ticks).toByte
 
         case `KEY`   =>
-          // FIXME
-          r(nibble(2, inst)) = 0x5.toByte
-
+          key_barrier.synchronized {
+            key_barrier.wait()
+          }
+          var key = 0
+          if (keys == null) {
+            println("Keyboard callback not set, program will hang forever")
+            panic_barrier.synchronized {
+              panic_barrier.wait()
+            }
+            false
+          }
+          else {
+            for (i <- 0 to 0xF)
+              if (keys(i.toByte)) key = i
+            r(nibble(2, inst)) = key.toByte
+          }
         case `SDELAY`=>
           if (delay != 0) {
             // TODO properly handle resetting the timer mid-countdown
@@ -325,8 +346,6 @@ object Emulator {
         case i =>
           print("Unimplemented instruction:")
           println(i)
-          panic = false
-
       }
       // TODO disable sound when timer has reached zero
       n -= 1
@@ -334,32 +353,7 @@ object Emulator {
     }
   }
 
-  def printScreen(): Unit =
-  {
-    print("╔")
-    for (_ <- 0 until g_width)
-      print("═")
-    println("╗")
 
-    for (y <- 0 until g_height) {
-      print("║")
-      for (x <- 0 until (g_width/8)) {
-        for (i <- 0 until 8) {
-          if ((mem(fb_base + y * (g_width/8) + x) & (0x80 >> i)) != 0)
-            print("█")
-          else
-            print(" ")
-        }
-      }
-      print("║")
-      println()
-    }
-
-    print("╚")
-    for (_ <- 0 until g_width)
-      print("═")
-    println("╝")
-  }
 
 
 
