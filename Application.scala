@@ -1,8 +1,8 @@
+package chip8
+
 import java.awt.image.BufferStrategy
 import java.awt.{Color, Canvas, Dimension}
 
-import chip8.Emulator
-import chip8.Controller
 import javax.swing.JFrame
 
 class Screen extends Canvas {
