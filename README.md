@@ -11,3 +11,5 @@ Known issues:
 * Keyboard input is still somewhat weird in some games
 * Collisions seem off (as seen in PONG)
 * No sound support
+* Player always wins in HIDDEN
+* Score remains 000 in Tetris
