@@ -221,7 +221,26 @@ class Emulator {
       inst = ((mem(pc) << 8) | (mem(pc + 1).toShort & 0xFF)) & 0xFFFF // CHIP-8 is big-endian
       import Instruction._
 
-      decode(inst) match {
+      val s = decode(inst) ///
+      val r_0 = r(0) ///
+      val r_1 = r(1) ///
+      val r_2 = r(2) ///
+      val r_3 = r(3) ///
+      val r_4 = r(4) ///
+      val r_5 = r(5) ///
+      val r_6 = r(6) ///
+      val r_7 = r(7) ///
+      val r_8 = r(8) ///
+      val r_9 = r(9) ///
+      val r_10 = r(10) ///
+      val r_11 = r(11) ///
+      val r_12 = r(12) ///
+      val r_13 = r(13) ///
+      val r_14 = r(14) ///
+      val r_15 = r(15) ///
+      val pp = pc + 2 ///
+      println(f"$inst%04x ($s%s: $pp%x ) $r_0%02x $r_1%02x $r_2%02x $r_3%02x $r_4%02x $r_5%02x $r_6%02x $r_7%02x $r_8%02x $r_9%02x $r_10%02x $r_11%02x $r_12%02x $r_13%02x $r_14%02x $r_15%02x $r_i%03x") ///
+      s match {
         case `CLS`   => for (i <- fb_base to 0xFFF) {
           mem(i) = 0.toByte
         }
@@ -231,19 +250,27 @@ class Emulator {
 
         case `JMP`   => pc = (inst & 0xFFF) - 2 // offset common tail
         case `JSR`   =>
+          val pp = pc + 2 ///
+          println(f"Jump : current adress $pp%X") ///
           mem(sp+1) = (pc & 0x0FF).toByte
           mem(sp) = (nibble(2, pc) & 0xF).toByte
           sp -= 2
           pc = (inst & 0xFFF) - 2 // offset common tail
 
         case `SKEQC` => if (r(nibble(2, inst)) == (inst & 0xFF).toByte) pc += 2
+          val rr = r(nibble(2, inst)) ///
+          println(f"op_3XNN VX:$rr%X register") ///
         case `SKNEC` => if (r(nibble(2, inst)) != (inst & 0xFF).toByte) pc += 2
         case `SKEQR` => if (r(nibble(2, inst)) == (inst & 0xF0).toByte) pc += 2
         case `LOAD`  => r(nibble(2, inst)) = (inst & 0xFF).toByte
+          val rr = nibble(2, inst) ///
+          val bb = inst & 0xFF ///
+          println(f"Set reg$rr%X to $bb%X") ///
         case `ADDC`  => r(nibble(2, inst)) = (r(nibble(2, inst)) + (inst & 0xFF).toByte).toByte
         case `MOV`   => r(nibble(2, inst)) = r(nibble(1, inst))
         case `OR`    => r(nibble(2, inst)) = (r(nibble(2, inst)) | r(nibble(1, inst))).toByte
         case `AND`   => r(nibble(2, inst)) = (r(nibble(2, inst)) & r(nibble(1, inst))).toByte
+          // 8xy2	and rx,ry	| AND register vy into register vx ///
         case `XOR`   => r(nibble(2, inst)) = (r(nibble(2, inst)) ^ r(nibble(1, inst))).toByte
         case `ADD`   =>
           // unsigned extend
@@ -288,6 +315,10 @@ class Emulator {
           r(0x0F) = 0x00.toByte
           val x = r(nibble(2, inst))
           val y = r(nibble(1, inst))
+
+          println("Dessin") ///
+          println(f"Coordonate : X $x%d Y $y%d") ///
+
           for (i <- 0 until (inst & 0xF)) {
             // draw sprite
             val sprite = mem((r_i & 0xFFF) + i).toShort & 0xFF
@@ -359,12 +390,12 @@ class Emulator {
           for (i <- 0 to nibble(2,inst)) {
             mem(r_i + i) = r(i)
           }
-          r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
+          // r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
         case `LDR`   =>
           for (i <- 0 to nibble(2,inst)) {
             r(i) = mem(r_i + i)
           }
-          r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
+          // r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
         case i =>
           print("Unimplemented instruction:")
           println(i)
