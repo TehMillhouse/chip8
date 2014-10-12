@@ -307,8 +307,8 @@ class Emulator {
               mem(mem_loc) = (mem(mem_loc) ^ (sprite << (8 - (x % 8))).toByte).toByte
             }
           }
-        case `SKPR`  => if (keys(nibble(2, inst))) pc += 2
-        case `SKUP`  => if (!keys(nibble(2, inst))) pc += 2
+        case `SKPR`  => if (keys(r(nibble(2, inst)))) pc += 2
+        case `SKUP`  => if (!keys(r(nibble(2, inst)))) pc += 2
         case `GDELAY`=>
           var ticks : Long = 0xFF
           if (timerStart != null)
