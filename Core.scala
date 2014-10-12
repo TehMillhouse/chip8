@@ -249,7 +249,7 @@ class Emulator {
           // unsigned extend
           val left = r(nibble(2, inst)).toShort & 0xFF
           val right = r(nibble(1, inst)).toShort & 0xFF
-          r(0xF) = nibble(1, left + right) // carry
+          r(0xF) = (nibble(2, left + right) >> 8).toByte // carry
           r(nibble(2, inst)) = (r(nibble(2, inst)) + r(nibble(1, inst))).toByte
 
         case `SUB`   =>
@@ -264,7 +264,7 @@ class Emulator {
 
         case `SHR`   =>
           r(0xF) = (r(nibble(2, inst)) & 0x1).toByte
-          r(nibble(2, inst)) = (r(nibble(2, inst)).toShort & 0xFF >> 1).toByte
+          r(nibble(2, inst)) = ((r(nibble(2, inst)).toShort & 0xFF) >> 1).toByte
 
         case `RSB`   =>
           // unsigned extend
@@ -278,7 +278,7 @@ class Emulator {
 
         case `SHL`   =>
           r(0xF) = ((r(nibble(2, inst)) & 0x80) >> 7).toByte
-          r(nibble(2, inst)) = (r(nibble(2, inst)).toShort & 0xFF << 1).toByte
+          r(nibble(2, inst)) = ((r(nibble(2, inst)).toShort & 0xFF) << 1).toByte
 
         case `SKNER` => if (r(nibble(2, inst)) != r(nibble(1,inst))) pc += 2
         case `MVI`   => r_i = (inst & 0xFFF).toShort
@@ -290,7 +290,7 @@ class Emulator {
           val y = r(nibble(1, inst))
           for (i <- 0 until (inst & 0xF)) {
             // draw sprite
-            val sprite = mem(r_i + i).toShort & 0xFF
+            val sprite = mem((r_i & 0xFFF) + i).toShort & 0xFF
             val mem_loc = fb_base + (screen_width/8) * ((y + i) % screen_height) + ((x/8) % (screen_width/8))
             if ((mem(mem_loc) & (sprite >> (x % 8)).toByte).toByte != 0) {
               // collision
@@ -349,8 +349,8 @@ class Emulator {
           soundStart = new Date()
           sound = r(nibble(2, inst))
 
-        case `ADI`   => r_i = (r_i + r(nibble(2, inst))).toShort
-        case `FONT`  => r_i = (font_base + (5 * r(nibble(2,inst)))).toShort
+        case `ADI`   => r_i = (r_i + (r(nibble(2, inst)).toShort & 0xFF)).toShort
+        case `FONT`  => r_i = (font_base + (5 * r(nibble(2,inst)).toShort & 0xFF)).toShort
         case `BCD`   =>
           mem(r_i) = ((r(nibble(2, inst)).toInt & 0xFF) / 100).toByte
           mem(r_i+1) = (((r(nibble(2, inst)).toInt & 0xFF) % 100) / 10).toByte
