@@ -1,6 +1,3 @@
-SCHIP-8
--------
-
 This is a CHIP-8 emulator written in Scala
 
 Point it to a ROM and play away!  
