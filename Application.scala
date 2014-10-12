@@ -64,7 +64,7 @@ object Application extends App {
 
   window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
   window.addKeyListener(controller)
-  window.setPreferredSize(new Dimension(640, 320))
+  window.setSize(640, 320)
   window.setIgnoreRepaint(true) // we'll draw it ourselves anyways
 
   window.setVisible(true)
