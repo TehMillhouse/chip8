@@ -52,7 +52,6 @@ class Screen extends Canvas {
 
 object Application extends App {
 
-  val default_rom = "/home/max/roms/PONG"
   var emulator = new Emulator()
   var controller = new Controller()
   controller.setEscapeCallback(() => emulator.abort())
@@ -77,8 +76,7 @@ object Application extends App {
   window.pack()
   screen.draw()
 
-
-  var rom_path = default_rom
+  var rom_path = ""
   if (args.length > 0) {
     rom_path = args(0)
   }

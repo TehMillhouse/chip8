@@ -110,7 +110,7 @@ class Emulator {
 
   def loadRom(path: String) {
     reset()
-    (new java.io.FileInputStream(path)).read(mem, 0x200, 0x1000-0x200)
+    (new java.io.FileInputStream(path)).read(mem, rom_base, 0x1000-rom_base)
   }
 
   def reset(): Unit = {
@@ -182,9 +182,7 @@ class Emulator {
       case _ if (inst & 0xF0FF) == 0xF033 => Instruction.BCD
       case _ if (inst & 0xF0FF) == 0xF055 => Instruction.STR
       case _ if (inst & 0xF0FF) == 0xF065 => Instruction.LDR
-      case _                              =>
-        println("Invalid instruction")
-        Instruction.INVALID
+      case _                              => Instruction.INVALID
     }
   }
 
@@ -197,7 +195,7 @@ class Emulator {
 
   def step = () => run(1)
 
-  def run(instructions : Int): Unit = {
+  def run(instructions : Int) : Unit = {
     var n = instructions
     var inst = 0x0000
     while (!panic && (n > 0 || n == -1)) {
@@ -205,7 +203,7 @@ class Emulator {
       import Instruction._
 
       decode(inst) match {
-        case `CLS`   => for (i <- fb_base until 0xFFF) {
+        case `CLS`   => for (i <- fb_base to 0xFFF) {
           mem(i) = 0.toByte
         }
         case `RTS`   =>
@@ -219,24 +217,26 @@ class Emulator {
           sp -= 2
           pc = (inst & 0xFFF) - 2 // offset common tail
 
-        case `SKEQC` => if (r(nibble(2, inst)) == (inst & 0xFF)) pc += 2
-        case `SKNEC` => if (r(nibble(2, inst)) != (inst & 0xFF)) pc += 2
-        case `SKEQR` => if (r(nibble(2, inst)) == (inst & 0xF0)) pc += 2
+        case `SKEQC` => if (r(nibble(2, inst)) == (inst & 0xFF).toByte) pc += 2
+        case `SKNEC` => if (r(nibble(2, inst)) != (inst & 0xFF).toByte) pc += 2
+        case `SKEQR` => if (r(nibble(2, inst)) == (inst & 0xF0).toByte) pc += 2
         case `LOAD`  => r(nibble(2, inst)) = (inst & 0xFF).toByte
-        case `ADDC`  => r(nibble(2, inst)) = (r(nibble(2, inst)) + (inst & 0xFF)).toByte
+        case `ADDC`  => r(nibble(2, inst)) = (r(nibble(2, inst)) + (inst & 0xFF).toByte).toByte
         case `MOV`   => r(nibble(2, inst)) = r(nibble(1, inst))
         case `OR`    => r(nibble(2, inst)) = (r(nibble(2, inst)) | r(nibble(1, inst))).toByte
         case `AND`   => r(nibble(2, inst)) = (r(nibble(2, inst)) & r(nibble(1, inst))).toByte
         case `XOR`   => r(nibble(2, inst)) = (r(nibble(2, inst)) ^ r(nibble(1, inst))).toByte
         case `ADD`   =>
-          val left = r(nibble(2, inst)).toShort & 0xFF // unsigned extend
-          val right = r(nibble(1, inst)).toShort & 0xFF // unsigned extend
+          // unsigned extend
+          val left = r(nibble(2, inst)).toShort & 0xFF
+          val right = r(nibble(1, inst)).toShort & 0xFF
           r(0xF) = nibble(1, left + right) // carry
           r(nibble(2, inst)) = (r(nibble(2, inst)) + r(nibble(1, inst))).toByte
 
         case `SUB`   =>
-          val left = r(nibble(2, inst)).toShort & 0xFF // unsigned extend
-          val right = r(nibble(1, inst)).toShort & 0xFF // unsigned extend
+          // unsigned extend
+          val left = r(nibble(2, inst)).toShort & 0xFF
+          val right = r(nibble(1, inst)).toShort & 0xFF
           if (left < right)  // borrow
             r(0xF) = 0x1.toByte
           else
@@ -248,8 +248,9 @@ class Emulator {
           r(nibble(2, inst)) = (r(nibble(2, inst)).toShort & 0xFF >> 1).toByte
 
         case `RSB`   =>
-          val left = r(nibble(2, inst)).toShort & 0xFF // unsigned extend
-        val right = r(nibble(1, inst)).toShort & 0xFF // unsigned extend
+          // unsigned extend
+          val left = r(nibble(2, inst)).toShort & 0xFF
+          val right = r(nibble(1, inst)).toShort & 0xFF
           if (left < right)  // borrow
             r(0xF) = 0x1.toByte
           else
@@ -262,7 +263,7 @@ class Emulator {
 
         case `SKNER` => if (r(nibble(2, inst)) != r(nibble(1,inst))) pc += 2
         case `MVI`   => r_i = (inst & 0xFFF).toShort
-        case `JMI`   => pc = ((inst & 0xFFF) + r(0)).toShort - 2
+        case `JMI`   => pc = ((inst & 0xFFF).toShort + r(0)).toShort - 2
         case `RAND`  => r(nibble(2, inst)) = (Random.nextInt(255) & (inst & 0xFF)).toByte
         case `SPRITE`=> // TODO: fix collisions
           r(0x0F) = 0x00.toByte
@@ -270,27 +271,29 @@ class Emulator {
           val y = r(nibble(1, inst))
           for (i <- 0 until (inst & 0xF)) {
             // draw sprite
-            val sprite = mem(r_i + i)
+            val sprite = mem(r_i + i).toShort & 0xFF
             val mem_loc = fb_base + (screen_width/8) * ((y + i) % screen_height) + ((x/8) % (screen_width/8))
-            if ((mem(mem_loc) & ((sprite.toShort & 0xFF) >> (x % 8)).toByte).toByte != 0) {
+            if ((mem(mem_loc) & (sprite >> (x % 8)).toByte).toByte != 0) {
               // collision
               r(0x0F) = 0x1.toByte
             }
-            mem(mem_loc) = (mem(mem_loc) ^ ((sprite.toShort & 0xFF) >> (x % 8)).toByte).toByte
+            mem(mem_loc) = (mem(mem_loc) ^ (sprite >> (x % 8)).toByte).toByte
             if (x % 8 != 0) {
               // we need to find a second byte right of this one
               val mem_loc = fb_base + (screen_width/8) * ((y + i) % screen_height) + (((x+8)/8) % (screen_width/8))
-              if ((mem(mem_loc) & ((sprite.toShort & 0xFF) << (8 - (x % 8))).toByte) != 0) {
+              if ((mem(mem_loc) & (sprite << (8 - (x % 8))).toByte) != 0) {
                 // collision
                 r(0x0F) = 0x1.toByte
               }
-              mem(mem_loc) = (mem(mem_loc) ^ ((sprite.toShort & 0xFF) << (8 - (x % 8))).toByte).toByte
+              mem(mem_loc) = (mem(mem_loc) ^ (sprite << (8 - (x % 8))).toByte).toByte
             }
           }
         case `SKPR`  => if (keys(nibble(2, inst))) pc += 2
         case `SKUP`  => if (!keys(nibble(2, inst))) pc += 2
         case `GDELAY`=>
-          val ticks = ((new Date()).getTime() - timerStart.getTime()) / 1000 * 60
+          var ticks : Long = 0xFF
+          if (timerStart != null)
+            ticks = ((new Date()).getTime() - timerStart.getTime()) / 1000 * 60
           if (delay - ticks < 0)
             r(nibble(2, inst)) = 0.toByte
           else
@@ -334,12 +337,12 @@ class Emulator {
           mem(r_i+1) = (((r(nibble(2, inst)).toInt & 0xFF) % 100) / 10).toByte
           mem(r_i+2) = (((r(nibble(2, inst)).toInt & 0xFF) % 10) / 100).toByte
         case `STR`   =>
-          for (i <- 0 until nibble(2,inst)) {
+          for (i <- 0 to nibble(2,inst)) {
             mem(r_i + i) = r(i)
           }
           r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
         case `LDR`   =>
-          for (i <- 0 until nibble(2,inst)) {
+          for (i <- 0 to nibble(2,inst)) {
             r(i) = mem(r_i + i)
           }
           r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
