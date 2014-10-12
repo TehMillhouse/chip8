@@ -1,5 +1,8 @@
 package chip8
 
+import chip8.Instruction.Instruction
+
+import scala.collection.immutable.List
 import util.Random
 import java.util.Date
 
@@ -113,6 +116,11 @@ class Emulator {
     (new java.io.FileInputStream(path)).read(mem, rom_base, 0x1000-rom_base)
   }
 
+  def disassemble() : List[Instruction] = {
+    for (i <- List.range(rom_base, (0x1000 - rom_base) / 2))
+      yield decode(((mem(i) << 8) | (mem(i + 1).toShort & 0xFF)) & 0xFFFF)
+  }
+
   def reset(): Unit = {
     mem.map(_ => 0)
     r.map(_ => 0)
@@ -194,6 +202,17 @@ class Emulator {
   }
 
   def step = () => run(1)
+
+  def trace(instructions : Int) : Array[Instruction] = {
+    val list = new Array[Instruction](instructions)
+    for (i <- 0 until instructions) {
+      val d = decode(((mem(pc) << 8) | (mem(pc + 1).toShort & 0xFF)) & 0xFFFF)
+      step()
+      list(i) = d
+    }
+
+    list
+  }
 
   def run(instructions : Int) : Unit = {
     var n = instructions
