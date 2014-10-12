@@ -9,6 +9,5 @@ Known issues:
 -------------
 
 * Keyboard input is still somewhat weird in some games
-* BLINKY doesn't boot
 * Collisions seem off (as seen in PONG)
 * No sound support
