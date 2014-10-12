@@ -53,8 +53,11 @@ class Screen extends Canvas {
 object Application extends App {
 
   var emulator = new Emulator()
+  var frame_delay = 20
   var controller = new Controller()
-  controller.setEscapeCallback(() => emulator.abort())
+  controller.escapePressed = () => emulator.abort()
+  controller.upPressed = () => { if (frame_delay > 0) frame_delay -= 1 }
+  controller.downPressed = () => { frame_delay += 1 }
   controller.setKeypressCallback(() => emulator.signalKey())
   emulator.setKeyboardCallbacks((x : Byte) => controller.status(x))
 
@@ -86,7 +89,7 @@ object Application extends App {
   println("rom loaded, starting rom...")
   while (true) {
     emulator.run(10)
-    Thread.sleep(20)
+    if (frame_delay > 0) Thread.sleep(frame_delay)
     screen.draw()
   }
   println("exiting.")

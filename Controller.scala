@@ -4,20 +4,18 @@ import java.awt.event.{KeyEvent, KeyListener}
 
 class Controller extends KeyListener {
   var status = new Array[Boolean](16)
-  private var escapePressed : () => _ = null
+  var escapePressed : () => _ = null
+  var upPressed : () => _ = null
+  var downPressed : () => _ = null
   private var signalKeypress : () => _ = null
 
-  def setEscapeCallback(func: () => _) {
-    escapePressed = func
-  }
-
-  def setKeypressCallback(func: () => _): Unit = {
+  def setKeypressCallback(func: () => _) {
     signalKeypress = func
   }
 
   override def keyTyped(e : KeyEvent) {}
 
-  override def keyPressed(e : KeyEvent): Unit = {
+  override def keyPressed(e : KeyEvent) {
     if (e.getKeyChar == 27 && escapePressed != null) escapePressed()
 
     var nop = false
@@ -54,6 +52,12 @@ class Controller extends KeyListener {
         status(0xB) = true
       case KeyEvent.VK_V =>
         status(0xF) = true
+
+      case KeyEvent.VK_UP =>
+        if (upPressed != null) upPressed()
+      case KeyEvent.VK_DOWN =>
+        if (downPressed != null) downPressed()
+
       case _ => nop = true
     }
     if (!nop) signalKeypress()
