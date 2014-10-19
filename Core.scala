@@ -357,7 +357,7 @@ class Emulator {
         case `BCD`   =>
           mem(r_i) = ((r(nibble(2, inst)).toInt & 0xFF) / 100).toByte
           mem(r_i+1) = (((r(nibble(2, inst)).toInt & 0xFF) % 100) / 10).toByte
-          mem(r_i+2) = (((r(nibble(2, inst)).toInt & 0xFF) % 10) / 100).toByte
+          mem(r_i+2) = ((r(nibble(2, inst)).toInt & 0xFF) % 10).toByte
         case `STR`   =>
           for (i <- 0 to nibble(2,inst)) {
             mem(r_i + i) = r(i)
