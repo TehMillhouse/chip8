@@ -132,7 +132,7 @@ class Emulator {
     sound = 0
     panic = false
     for (i <- font.indices)
-      mem(i) = font(i).toByte
+      mem(font_base + i) = font(i).toByte
   }
 
   def pixel(x: Int,y: Int) : Boolean = {
