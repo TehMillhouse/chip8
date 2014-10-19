@@ -6,6 +6,8 @@ import scala.collection.immutable.List
 import util.Random
 import math.min
 import java.util.Date
+import java.io.File
+import javax.sound.sampled._
 
 object Instruction extends Enumeration {
   type Instruction = Value //((java.lang.Integer, java.lang.Integer) => Unit)
@@ -91,6 +93,7 @@ class Emulator {
 
   private val r = new Array[Byte](16)
   private var r_i : Short = 0
+  private var sound_clip : Clip = null
   private var pc = 0
   private var sp = 0
   private var delay = 0
@@ -133,6 +136,18 @@ class Emulator {
     panic = false
     for (i <- font.indices)
       mem(font_base + i) = font(i).toByte
+
+    if (sound_clip != null) {
+      sound_clip.stop()
+    }
+  }
+
+  def playSound(): Unit = {
+    val url = this.getClass().getClassLoader().getResource("sound.wav")
+    val audioIn = AudioSystem.getAudioInputStream(url)
+    sound_clip = AudioSystem.getClip()
+    sound_clip.open(audioIn)
+    sound_clip.loop(Clip.LOOP_CONTINUOUSLY)
   }
 
   def pixel(x: Int,y: Int) : Boolean = {
@@ -220,6 +235,17 @@ class Emulator {
     var inst = 0x0000
     while (!panic && (n > 0 || n == -1)) {
       inst = ((mem(pc) << 8) | (mem(pc + 1).toShort & 0xFF)) & 0xFFFF // CHIP-8 is big-endian
+
+      // sound handling
+      if (soundStart != null) {
+        val ticks = ((new Date()).getTime() - soundStart.getTime()) / 1000 * 60
+        if (sound - ticks <= 0) {
+          sound_clip.stop()
+          soundStart = null
+        }
+      }
+
+
       import Instruction._
 
       decode(inst) match {
@@ -339,18 +365,15 @@ class Emulator {
             r(nibble(2, inst)) = key.toByte
           }
         case `SDELAY`=>
-          if (delay != 0) {
-            // TODO properly handle resetting the timer mid-countdown
-          }
           timerStart = new Date()
           delay = r(nibble(2, inst))
 
         case `SSOUND`=>
-          if (delay != 0) {
-            // TODO properly handle resetting the timer mid-countdown
-          }
           soundStart = new Date()
+
           sound = r(nibble(2, inst))
+          if (sound > 0 && (sound_clip == null || !sound_clip.isActive))
+            playSound()
 
         case `ADI`   => r_i = (r_i + (r(nibble(2, inst)).toShort & 0xFF)).toShort
         case `FONT`  => r_i = (font_base + (5 * r(nibble(2,inst)).toShort & 0xFF)).toShort
