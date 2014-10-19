@@ -258,9 +258,9 @@ class Emulator {
           val left = r(nibble(2, inst)).toShort & 0xFF
           val right = r(nibble(1, inst)).toShort & 0xFF
           if (left < right)  // borrow
-            r(0xF) = 0x1.toByte
-          else
             r(0xF) = 0x0.toByte
+          else
+            r(0xF) = 0x1.toByte
           r(nibble(2, inst)) = (r(nibble(2, inst)) - r(nibble(1, inst))).toByte
 
         case `SHR`   =>
@@ -272,9 +272,9 @@ class Emulator {
           val left = r(nibble(2, inst)).toShort & 0xFF
           val right = r(nibble(1, inst)).toShort & 0xFF
           if (left < right)  // borrow
-            r(0xF) = 0x1.toByte
-          else
             r(0xF) = 0x0.toByte
+          else
+            r(0xF) = 0x1.toByte
           r(nibble(2, inst)) = (r(nibble(1, inst)) - r(nibble(2, inst))).toByte
 
         case `SHL`   =>
