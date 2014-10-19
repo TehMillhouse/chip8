@@ -238,7 +238,7 @@ class Emulator {
 
       // sound handling
       if (soundStart != null) {
-        val ticks = ((new Date()).getTime() - soundStart.getTime()) / 1000 * 60
+        val ticks = ((new Date()).getTime() - soundStart.getTime()) * 60 / 1000
         if (sound - ticks <= 0) {
           sound_clip.stop()
           soundStart = null
@@ -341,7 +341,7 @@ class Emulator {
         case `GDELAY`=>
           var ticks : Long = 0xFF
           if (timerStart != null)
-            ticks = ((new Date()).getTime() - timerStart.getTime()) / 1000 * 60
+            ticks = ((new Date()).getTime() - timerStart.getTime()) * 60 / 1000
           if (delay - ticks < 0)
             r(nibble(2, inst)) = 0.toByte
           else
