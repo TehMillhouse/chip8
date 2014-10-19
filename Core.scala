@@ -93,10 +93,8 @@ class Emulator {
   private var r_i : Short = 0
   private var pc = 0
   private var sp = 0
-  private var delay = 0
-  private var sound = 0
-  private var soundStart : Date = null
-  private var timerStart : Date = null
+  private var timer : Byte = 0
+  private var sound : Byte = 0
   private var keys : (Byte => Boolean) = null
   private object key_barrier
   private var panic = false
@@ -128,7 +126,7 @@ class Emulator {
     r_i = 0
     pc = rom_base
     sp = stack_top - 1 // sp is to point to the freshest free 16-bit stack slot
-    delay = 0
+    timer = 0
     sound = 0
     panic = false
     for (i <- font.indices)
@@ -195,7 +193,7 @@ class Emulator {
     }
   }
 
-  def abort(): Unit = {
+  def abort() {
     panic_barrier.synchronized {
       panic = true
       panic_barrier.notifyAll()
@@ -222,6 +220,8 @@ class Emulator {
       inst = ((mem(pc) << 8) | (mem(pc + 1).toShort & 0xFF)) & 0xFFFF // CHIP-8 is big-endian
       import Instruction._
 
+      if (timer > 0) timer = (timer - 1).toByte
+      if (sound > 0) sound = (sound - 1).toByte
       decode(inst) match {
         case `CLS`   => for (i <- fb_base to 0xFFF) {
           mem(i) = 0.toByte
@@ -313,13 +313,7 @@ class Emulator {
         case `SKPR`  => if (keys(r(nibble(2, inst)))) pc += 2
         case `SKUP`  => if (!keys(r(nibble(2, inst)))) pc += 2
         case `GDELAY`=>
-          var ticks : Long = 0xFF
-          if (timerStart != null)
-            ticks = ((new Date()).getTime() - timerStart.getTime()) / 1000 * 60
-          if (delay - ticks < 0)
-            r(nibble(2, inst)) = 0.toByte
-          else
-            r(nibble(2, inst)) = (delay - ticks).toByte
+          r(nibble(2, inst)) = timer
 
         case `KEY`   =>
           key_barrier.synchronized {
@@ -339,17 +333,9 @@ class Emulator {
             r(nibble(2, inst)) = key.toByte
           }
         case `SDELAY`=>
-          if (delay != 0) {
-            // TODO properly handle resetting the timer mid-countdown
-          }
-          timerStart = new Date()
-          delay = r(nibble(2, inst))
+          timer = r(nibble(2, inst))
 
         case `SSOUND`=>
-          if (delay != 0) {
-            // TODO properly handle resetting the timer mid-countdown
-          }
-          soundStart = new Date()
           sound = r(nibble(2, inst))
 
         case `ADI`   => r_i = (r_i + (r(nibble(2, inst)).toShort & 0xFF)).toShort
