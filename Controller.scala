@@ -7,6 +7,8 @@ class Controller extends KeyListener {
   var escapePressed : () => _ = null
   var upPressed : () => _ = null
   var downPressed : () => _ = null
+  var jPressed : () => _ = null
+  var kPressed : () => _ = null
   private var signalKeypress : () => _ = null
 
   def setKeypressCallback(func: () => _) {
@@ -53,6 +55,10 @@ class Controller extends KeyListener {
       case KeyEvent.VK_V =>
         status(0xF) = true
 
+      case KeyEvent.VK_J =>
+        if (jPressed != null) jPressed()
+      case KeyEvent.VK_K =>
+        if (kPressed != null) kPressed()
       case KeyEvent.VK_UP =>
         if (upPressed != null) upPressed()
       case KeyEvent.VK_DOWN =>

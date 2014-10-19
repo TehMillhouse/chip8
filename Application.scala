@@ -54,10 +54,13 @@ object Application extends App {
 
   var emulator = new Emulator()
   var frame_delay = 20
+  var cpu_step = 10
   var controller = new Controller()
   controller.escapePressed = () => emulator.abort()
   controller.upPressed = () => { if (frame_delay > 0) frame_delay -= 1 }
   controller.downPressed = () => { frame_delay += 1 }
+  controller.jPressed = () => { cpu_step += 1 }
+  controller.kPressed = () => { if (cpu_step > 0) cpu_step -= 1 }
   controller.setKeypressCallback(() => emulator.signalKey())
   emulator.setKeyboardCallbacks((x : Byte) => controller.status(x))
 
@@ -88,7 +91,7 @@ object Application extends App {
   emulator.loadRom(rom_path)
   println("rom loaded, starting rom...")
   while (true) {
-    emulator.run(10)
+    emulator.run(cpu_step)
     if (frame_delay > 0) Thread.sleep(frame_delay)
     screen.draw()
   }
