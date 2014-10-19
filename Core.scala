@@ -4,6 +4,7 @@ import chip8.Instruction.Instruction
 
 import scala.collection.immutable.List
 import util.Random
+import math.min
 import java.util.Date
 
 object Instruction extends Enumeration {
@@ -238,7 +239,7 @@ class Emulator {
 
         case `SKEQC` => if (r(nibble(2, inst)) == (inst & 0xFF).toByte) pc += 2
         case `SKNEC` => if (r(nibble(2, inst)) != (inst & 0xFF).toByte) pc += 2
-        case `SKEQR` => if (r(nibble(2, inst)) == (inst & 0xF0).toByte) pc += 2
+        case `SKEQR` => if (r(nibble(2, inst)) == r(nibble(1, inst))) pc += 2
         case `LOAD`  => r(nibble(2, inst)) = (inst & 0xFF).toByte
         case `ADDC`  => r(nibble(2, inst)) = (r(nibble(2, inst)) + (inst & 0xFF).toByte).toByte
         case `MOV`   => r(nibble(2, inst)) = r(nibble(1, inst))
@@ -274,7 +275,7 @@ class Emulator {
             r(0xF) = 0x1.toByte
           else
             r(0xF) = 0x0.toByte
-          r(nibble(2, inst)) = (r(nibble(2, inst)) - r(nibble(1, inst))).toByte
+          r(nibble(2, inst)) = (r(nibble(1, inst)) - r(nibble(2, inst))).toByte
 
         case `SHL`   =>
           r(0xF) = ((r(nibble(2, inst)) & 0x80) >> 7).toByte
@@ -285,21 +286,23 @@ class Emulator {
         case `JMI`   => pc = ((inst & 0xFFF).toShort + r(0)).toShort - 2
         case `RAND`  => r(nibble(2, inst)) = (Random.nextInt(255) & (inst & 0xFF)).toByte
         case `SPRITE`=> // TODO: fix collisions
+          // see http://laurencescotford.co.uk/?p=304 for details on sprite drawing
           r(0x0F) = 0x00.toByte
-          val x = r(nibble(2, inst))
-          val y = r(nibble(1, inst))
-          for (i <- 0 until (inst & 0xF)) {
+          val x = r(nibble(2, inst)) % screen_width
+          val y = r(nibble(1, inst)) % screen_height
+          val height = math.min(inst & 0xF, screen_height - y)
+          for (i <- 0 until height) {
             // draw sprite
             val sprite = mem((r_i & 0xFFF) + i).toShort & 0xFF
-            val mem_loc = fb_base + (screen_width/8) * ((y + i) % screen_height) + ((x/8) % (screen_width/8))
+            val mem_loc = fb_base + (screen_width/8) * (y + i) + x/8
             if ((mem(mem_loc) & (sprite >> (x % 8)).toByte).toByte != 0) {
               // collision
               r(0x0F) = 0x1.toByte
             }
             mem(mem_loc) = (mem(mem_loc) ^ (sprite >> (x % 8)).toByte).toByte
-            if (x % 8 != 0) {
+            if (x % 8 != 0 && x < screen_width - 8) {
               // we need to find a second byte right of this one
-              val mem_loc = fb_base + (screen_width/8) * ((y + i) % screen_height) + (((x+8)/8) % (screen_width/8))
+              val mem_loc = fb_base + (screen_width/8) * (y + i) + (x+8)/8
               if ((mem(mem_loc) & (sprite << (8 - (x % 8))).toByte) != 0) {
                 // collision
                 r(0x0F) = 0x1.toByte
@@ -359,12 +362,14 @@ class Emulator {
           for (i <- 0 to nibble(2,inst)) {
             mem(r_i + i) = r(i)
           }
-          r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
+          // most chip8 emulators don't perform the following part of this operation, even though it's in the specs
+          // r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
         case `LDR`   =>
           for (i <- 0 to nibble(2,inst)) {
             r(i) = mem(r_i + i)
           }
-          r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
+          // most chip8 emulators don't perform the following part of this operation, even though it's in the specs
+          // r_i = (r_i + (nibble(2,inst).toShort & 0xFF) + 1).toShort
         case i =>
           print("Unimplemented instruction:")
           println(i)
